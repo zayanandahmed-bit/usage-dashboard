@@ -2,7 +2,7 @@
 
 Live token use and spend for your Anthropic account.
 
-- `site/index.html`: the dashboard (GitHub Pages). No secrets in it.
+- `docs/index.html`: the dashboard (GitHub Pages). No secrets in it.
 - `supabase/functions/daysback-usage/`: reads Anthropic's usage report with a key that lives only in Supabase.
 
 Secrets (Supabase > Edge Functions > Secrets): `ANTHROPIC_ADMIN_KEY`, `USAGE_PASSCODE`.
