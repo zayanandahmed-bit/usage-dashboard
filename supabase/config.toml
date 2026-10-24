@@ -1,0 +1,6 @@
+project_id = "ajevxwdgmpaakjkffvmf"
+
+[functions.daysback-usage]
+# The dashboard calls this without a Supabase login; the function does its own
+# checks (allowed origins, passcode).
+verify_jwt = false

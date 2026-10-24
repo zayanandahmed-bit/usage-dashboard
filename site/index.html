@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DaysBack AI Usage</title>
+<meta name="robots" content="noindex">
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb; --page: #f9f9f7;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6d67;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10);
+  --s-uncached: #2a78d6; --s-write: #eb6834; --s-read: #1baf7a; --s-out: #eda100;
+  --m-haiku: #6250d6; --m-sonnet: #e87ba4; --m-other: #898781;
+  --good: #0ca30c; --warn: #fab219; --crit: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface: #1a1a19; --page: #0d0d0d;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a09e96;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10);
+    --s-uncached: #3987e5; --s-write: #d95926; --s-read: #199e70; --s-out: #c98500;
+    --m-haiku: #9085e9; --m-sonnet: #d55181;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1a19; --page: #0d0d0d;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a09e96;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10);
+  --s-uncached: #3987e5; --s-write: #d95926; --s-read: #199e70; --s-out: #c98500;
+  --m-haiku: #9085e9; --m-sonnet: #d55181;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 64px; }
+h1 { font-size: 20px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+h2 { font-size: 15px; margin: 0 0 2px; font-weight: 650; }
+.sub { color: var(--ink-2); font-size: 13px; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+button { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 6px 11px; cursor: pointer; }
+button:hover { background: color-mix(in srgb, var(--ink) 6%, var(--surface)); }
+button:focus-visible, input:focus-visible, svg:focus-visible { outline: 2px solid var(--s-uncached); outline-offset: 2px; }
+.top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.dot.live { background: var(--good); } .dot.err { background: var(--crit); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--ring); border-radius: 9px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 6px 13px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 16px; margin-bottom: 14px; transition: opacity .2s; }
+.loading .card, .loading .kpis { opacity: .55; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px; transition: opacity .2s; }
+.tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 14px 16px; }
+.tile .l { color: var(--ink-2); font-size: 13px; }
+.tile .v { font-size: 26px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0; }
+.tile .n { color: var(--muted); font-size: 12.5px; }
+.hero { grid-column: span 2; }
+.hero .v { font-size: 56px; line-height: 1.05; }
+@media (max-width: 560px) { .hero { grid-column: span 1; } .hero .v { font-size: 46px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 4px; font-size: 13px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.chart { position: relative; }
+svg { display: block; width: 100%; height: auto; }
+.tick { fill: var(--muted); font-size: 11px; }
+.tip { position: absolute; pointer-events: none; z-index: 5; background: var(--surface); border: 1px solid var(--ring); box-shadow: 0 6px 24px rgba(0,0,0,.18); border-radius: 10px; padding: 9px 11px; font-size: 12.5px; min-width: 170px; }
+.tip .tt { color: var(--ink-2); margin-bottom: 4px; }
+.tip .r { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.tip .k { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+.tip .val { font-weight: 650; margin-left: auto; padding-left: 14px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th { text-align: left; color: var(--ink-2); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; margin-top: 4px; }
+.bar b { display: block; height: 100%; border-radius: 3px; }
+.banner { border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; border: 1px solid var(--ring); background: var(--surface); }
+.banner.err { border-color: var(--crit); } .banner.warn { border-color: var(--warn); } .banner.demo { border-style: dashed; }
+.gate { max-width: 380px; margin: 14vh auto; padding: 0 16px; }
+.gate form { display: flex; gap: 8px; margin-top: 12px; }
+.gate input { flex: 1; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--ring); background: var(--surface); }
+.meter { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--s-uncached) 20%, var(--surface)); overflow: hidden; margin: 10px 0 6px; }
+.meter b { display: block; height: 100%; border-radius: 6px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.inl { width: 110px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--ring); background: var(--surface); }
+.empty { color: var(--muted); padding: 28px 0; text-align: center; }
+.fine { color: var(--muted); font-size: 12px; margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate" hidden>
+  <h1>DaysBack AI usage</h1>
+  <p class="sub">Enter your passcode to see live token use and spend.</p>
+  <form id="gateForm">
+    <input id="gatePass" type="password" autocomplete="current-password" placeholder="Passcode" aria-label="Passcode" required>
+    <button type="submit">Open</button>
+  </form>
+  <p class="sub" id="gateMsg" style="color:var(--crit);margin-top:10px"></p>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <div class="top">
+    <div>
+      <h1>DaysBack AI usage</h1>
+      <p class="sub">Tokens and spend from your Anthropic account, refreshed every minute.</p>
+    </div>
+    <div class="status">
+      <span class="dot" id="dot"></span><span id="statusText">Connecting…</span>
+      <button id="refresh" type="button">Refresh</button>
+      <button id="pause" type="button" aria-pressed="false">Pause</button>
+      <button id="signout" type="button">Sign out</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="seg" role="group" aria-label="Time range" id="ranges">
+      <button type="button" data-r="1h">1 hour</button>
+      <button type="button" data-r="6h">6 hours</button>
+      <button type="button" data-r="24h">24 hours</button>
+      <button type="button" data-r="7d">7 days</button>
+      <button type="button" data-r="30d">30 days</button>
+    </div>
+    <button id="csv" type="button">Download CSV</button>
+    <button id="tableBtn" type="button" aria-pressed="false">Table view</button>
+  </div>
+
+  <div id="banners"></div>
+
+  <div id="body">
+    <div class="kpis" id="kpis"></div>
+
+    <section class="card" id="cTokens">
+      <h2>Tokens over time</h2>
+      <p class="sub" id="tokensSub"></p>
+      <div class="legend" id="tokensLegend"></div>
+      <div class="chart" id="tokensChart"></div>
+    </section>
+
+    <section class="card" id="cCost">
+      <h2>Cost over time, by model</h2>
+      <p class="sub">Estimated from Anthropic's published prices.</p>
+      <div class="legend" id="costLegend"></div>
+      <div class="chart" id="costChart"></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card"><h2>By model</h2><div id="models"></div></section>
+      <section class="card"><h2>By API key</h2><p class="sub">Give each app its own key (clinic bot, website chat) to split spend.</p><div id="keys"></div></section>
+    </div>
+
+    <section class="card" id="cHours" hidden>
+      <h2>Busiest hours of the day</h2>
+      <p class="sub">Total tokens by hour, in your local time.</p>
+      <div class="chart" id="hoursChart"></div>
+    </section>
+
+    <section class="card">
+      <h2>Monthly budget</h2>
+      <div class="row">
+        <label for="budget" class="sub">Budget for this month (USD)</label>
+        <input class="inl" id="budget" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 20">
+      </div>
+      <div id="budgetOut"></div>
+    </section>
+
+    <section class="card" id="cTable" hidden>
+      <h2>All the numbers</h2>
+      <div style="overflow-x:auto"><table id="dataTable"></table></div>
+    </section>
+  </div>
+  <p class="fine" id="fine"></p>
+</div>
+
+<script>
+"use strict";
+// ---------- config ----------
+var FN_URL = "https://ajevxwdgmpaakjkffvmf.supabase.co/functions/v1/daysback-usage";
+var DEMO = /[?&]demo=1\b/.test(location.search);
+var PASS_KEY = "daysback.usage.pass.v1", RANGE_KEY = "daysback.usage.range.v1", BUDGET_KEY = "daysback.usage.budget.v1";
+
+// ---------- tiny helpers ----------
+function $(id) { return document.getElementById(id); }
+function el(tag, props, kids) {
+  var e = document.createElement(tag);
+  Object.keys(props || {}).forEach(function (k) {
+    if (k === "text") e.textContent = props[k];
+    else e.setAttribute(k, props[k]);
+  });
+  (kids || []).forEach(function (c) { e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return e;
+}
+function svgEl(tag, attrs) {
+  var e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+  return e;
+}
+function store(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function compact(n) {
+  var a = Math.abs(n);
+  if (a >= 1e9) return (n / 1e9).toFixed(a >= 1e10 ? 0 : 1).replace(/\.0$/, "") + "B";
+  if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
+  if (a >= 1e3) return (n / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
+  return String(Math.round(n));
+}
+function usd(n) {
+  if (n === null || n === undefined) return "n/a";
+  var a = Math.abs(n);
+  if (a === 0) return "$0";
+  if (a < 0.01) return "$" + n.toFixed(4);
+  if (a < 1) return "$" + n.toFixed(3);
+  if (a < 100) return "$" + n.toFixed(2);
+  return "$" + Math.round(n).toLocaleString("en-GB");
+}
+function pct(x) { return x === null || x === undefined ? "n/a" : (x * 100).toFixed(x >= 0.995 || x < 0.1 ? 1 : 0).replace(/\.0$/, "") + "%"; }
+
+// ---------- palette ----------
+var TOKEN_SERIES = [
+  { key: "uncached", label: "New input", css: "--s-uncached", note: "read fresh, full price" },
+  { key: "write", label: "Cache write", css: "--s-write", note: "storing the prompt for reuse" },
+  { key: "read", label: "Cache read", css: "--s-read", note: "reused, about a tenth of the price" },
+  { key: "out", label: "Output", css: "--s-out", note: "the reply the model wrote" }
+];
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function modelColor(m) {
+  if (/haiku-5-5/.test(m)) return "--m-haiku";
+  if (/sonnet-5-5/.test(m)) return "--m-sonnet";
+  return "--m-other";
+}
+var MODEL_NAMES = { "claude-haiku-5-5": "Haiku 5.5", "claude-sonnet-5-5": "Sonnet 5.5" };
+function modelName(m) { return MODEL_NAMES[m] || m; }
+
+// ---------- state ----------
+var state = { range: load(RANGE_KEY) || "1h", data: null, timer: null, paused: false, secs: 60, inflight: false, table: false };
+if (!/^(1h|6h|24h|7d|30d)$/.test(state.range)) state.range = "1h";
+
+// ---------- demo data (?demo=1) ----------
+var DEMO_PRICE = { "claude-haiku-5-5": [0.10, 0.20, 0.01, 0.50], "claude-sonnet-5-5": [2, 4, 0.10, 10] };
+function demoData(range) {
+  var cfg = { "1h": [60, 60000, 1], "6h": [72, 300000, 5], "24h": [24, 3600000, 60], "7d": [168, 3600000, 60], "30d": [30, 86400000, 1440] }[range];
+  var n = cfg[0], step = cfg[1], mins = cfg[2], now = Date.now(), series = [];
+  var seed = 7;
+  function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+  var totals = { uncached: 0, w5: 0, w1: 0, read: 0, out: 0 }, models = {}, cost = 0, saving = 0;
+  for (var i = 0; i < n; i++) {
+    var t = new Date(Math.floor(now / step) * step - (n - 1 - i) * step);
+    var hr = t.getHours() + (step < 3600000 ? t.getMinutes() / 60 : 12);
+    var busy = (hr >= 9 && hr <= 18 ? 1 : 0.12) * (0.6 + rnd());
+    // about 200 messages a day: roughly a third of a message a minute in opening hours
+    var expected = busy * mins * 0.33 * (step >= 86400000 ? 0.8 : 1);
+    var msgs = Math.floor(expected) + (rnd() < expected - Math.floor(expected) ? 1 : 0);
+    var pt = { t: t.toISOString(), tokens: { uncached: 0, w5: 0, w1: 0, read: 0, out: 0 }, cost: 0, byModel: {} };
+    [["claude-haiku-5-5", 0.7 * 1.3], ["claude-sonnet-5-5", 0.3 * 3]].forEach(function (m) {
+      var calls = msgs * m[1], p = DEMO_PRICE[m[0]];
+      var tkn = { uncached: calls * 50, w5: 0, w1: calls * 150, read: calls * 1980, out: calls * 100 };
+      var c = (tkn.uncached * p[0] + tkn.w1 * p[1] + tkn.read * p[2] + tkn.out * p[3]) / 1e6;
+      var sv = (tkn.read * (p[0] - p[2]) - tkn.w1 * (p[1] - p[0])) / 1e6;
+      Object.keys(tkn).forEach(function (k) { pt.tokens[k] += tkn[k]; totals[k] += tkn[k]; });
+      pt.cost += c; cost += c; saving += sv;
+      pt.byModel[m[0]] = { tokens: tkn, cost: c };
+      models[m[0]] = models[m[0]] || { model: m[0], name: modelName(m[0]), priced: true, tokens: { uncached: 0, w5: 0, w1: 0, read: 0, out: 0 }, cost: 0, saving: 0 };
+      Object.keys(tkn).forEach(function (k) { models[m[0]].tokens[k] += tkn[k]; });
+      models[m[0]].cost += c; models[m[0]].saving += sv;
+    });
+    series.push(pt);
+  }
+  var input = totals.uncached + totals.w5 + totals.w1 + totals.read;
+  var recent = series.slice(-6, -1);
+  function share(f) { return { uncached: totals.uncached * f, w5: 0, w1: totals.w1 * f, read: totals.read * f, out: totals.out * f }; }
+  return {
+    ready: true, demo: true, range: range, bucket: range === "30d" ? "1d" : (range === "24h" || range === "7d") ? "1h" : "1m",
+    mergedMinutes: range === "6h" ? 5 : null,
+    generatedAt: new Date().toISOString(), series: series,
+    totals: { tokens: totals, cost: cost, unpricedTokens: 0, inputTokens: input, allTokens: input + totals.out, cacheHitRate: input ? totals.read / input : null, cacheSaving: saving },
+    models: Object.keys(models).map(function (k) { return models[k]; }).sort(function (a, b) { return b.cost - a.cost; }),
+    keys: [{ id: "k1", name: "Clinic bot", cost: cost * 0.93, tokens: share(0.93) }, { id: "k2", name: "Website chat", cost: cost * 0.07, tokens: share(0.07) }],
+    month: { cost: 6.2, tokens: 41200000, projectedCost: 11.4, daysElapsed: 16.5, daysInMonth: 31 },
+    perMinute: range === "1h" || range === "6h" ? recent.reduce(function (s, p) { return s + totalOf(p.tokens); }, 0) / (recent.length * (range === "6h" ? 5 : 1)) : null
+  };
+}
+
+// ---------- data ----------
+function tk(t) { return { uncached: t.uncached || 0, write: (t.w5 || 0) + (t.w1 || 0), read: t.read || 0, out: t.out || 0 }; }
+function totalOf(t) { return (t.uncached || 0) + (t.w5 || 0) + (t.w1 || 0) + (t.read || 0) + (t.out || 0); }
+
+function fetchData() {
+  if (DEMO) return Promise.resolve(demoData(state.range));
+  var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+  var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 25000) : null;
+  return fetch(FN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-passcode": load(PASS_KEY) || "" },
+    body: JSON.stringify({ range: state.range }),
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function (r) {
+    clearTimeout(timer);
+    return r.json().catch(function () { return {}; }).then(function (d) { d._status = r.status; return d; });
+  }, function () { clearTimeout(timer); return { error: "network", detail: "Couldn't reach the usage service. Check your connection.", _status: 0 }; });
+}
+
+function refresh() {
+  if (state.inflight) return;
+  state.inflight = true;
+  $("body").classList.add("loading");
+  fetchData().then(function (d) {
+    state.inflight = false;
+    $("body").classList.remove("loading");
+    if (d._status === 401) { store(PASS_KEY, null); showGate("That passcode wasn't right."); return; }
+    if (d.error) { showError(d); return; }
+    state.data = d;
+    state.secs = 60;
+    render();
+  });
+}
+
+function showError(d) {
+  $("dot").className = "dot err";
+  $("statusText").textContent = "Not connected";
+  var msg = d.detail || "Something went wrong.";
+  var steps = d.error === "no_admin_key"
+    ? "Add your Anthropic key in Supabase, under Edge Functions, Secrets, as ANTHROPIC_ADMIN_KEY. The dashboard fills in once it's there."
+    : d.error === "admin_key_rejected"
+      ? "Anthropic didn't accept the key. Create a new API key in the Console with Scope set to Organization (not a workspace), and save it as ANTHROPIC_ADMIN_KEY."
+      : "";
+  var b = $("banners"); b.textContent = "";
+  var box = el("div", { class: "banner err", role: "alert" }, [el("strong", { text: msg })]);
+  if (steps) box.appendChild(el("div", { text: steps, class: "sub", style: "margin-top:4px" }));
+  b.appendChild(box);
+  $("kpis").textContent = "";
+}
+
+// ---------- gate ----------
+function showGate(msg) {
+  $("app").hidden = true; $("gate").hidden = false;
+  $("gateMsg").textContent = msg || "";
+  clearInterval(state.timer);
+  setTimeout(function () { $("gatePass").focus(); }, 0);
+}
+function showApp() {
+  $("gate").hidden = true; $("app").hidden = false;
+  $("fine").textContent = DEMO ? "Demo data. Nothing here is real." : "";
+  startTimer(); refresh();
+}
+$("gateForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  store(PASS_KEY, $("gatePass").value);
+  $("gatePass").value = "";
+  showApp();
+});
+$("signout").addEventListener("click", function () { store(PASS_KEY, null); showGate(""); });
+
+// ---------- controls ----------
+function setRanges() {
+  document.querySelectorAll("#ranges button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.r === state.range)); });
+}
+$("ranges").addEventListener("click", function (e) {
+  var b = e.target.closest("button[data-r]"); if (!b) return;
+  state.range = b.dataset.r; store(RANGE_KEY, state.range); setRanges(); refresh();
+});
+$("refresh").addEventListener("click", refresh);
+$("pause").addEventListener("click", function () {
+  state.paused = !state.paused; $("pause").setAttribute("aria-pressed", String(state.paused));
+  $("pause").textContent = state.paused ? "Resume" : "Pause"; renderStatus();
+});
+$("tableBtn").addEventListener("click", function () {
+  state.table = !state.table; $("tableBtn").setAttribute("aria-pressed", String(state.table));
+  $("cTable").hidden = !state.table; if (state.table) renderTable();
+});
+$("budget").value = load(BUDGET_KEY) || "";
+$("budget").addEventListener("input", function () { store(BUDGET_KEY, $("budget").value); if (state.data) { render(); } });
+function startTimer() {
+  clearInterval(state.timer);
+  state.timer = setInterval(function () {
+    if (state.paused || document.hidden) return;
+    state.secs -= 1;
+    if (state.secs <= 0) refresh(); else renderStatus();
+  }, 1000);
+}
+document.addEventListener("visibilitychange", function () { if (!document.hidden && state.data && state.secs < 55) refresh(); });
+
+function renderStatus() {
+  var d = state.data; if (!d) return;
+  $("dot").className = "dot " + (state.paused ? "" : "live");
+  var t = new Date(d.generatedAt);
+  $("statusText").textContent = (state.paused ? "Paused. " : "Live. ") + "Updated " + t.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + (state.paused ? "" : ", next in " + state.secs + "s");
+}
+
+// ---------- rendering ----------
+function render() {
+  var d = state.data;
+  $("banners").textContent = "";
+  if (d.demo) $("banners").appendChild(el("div", { class: "banner demo", text: "Demo data: this is what the dashboard looks like with a busy clinic. Nothing here is real." }));
+  renderStatus(); renderKpis(); renderTokens(); renderCost(); renderModels(); renderKeys(); renderHours(); renderBudget();
+  if (state.table) renderTable();
+}
+
+function tile(label, value, note, cls) {
+  return el("div", { class: "tile " + (cls || "") }, [
+    el("div", { class: "l", text: label }), el("div", { class: "v", text: value }), el("div", { class: "n", text: note || "" })
+  ]);
+}
+var RANGE_WORDS = { "1h": "last hour", "6h": "last 6 hours", "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days" };
+
+function renderKpis() {
+  var d = state.data, T = d.totals, k = $("kpis"); k.textContent = "";
+  k.appendChild(tile("Estimated cost, " + RANGE_WORDS[d.range], usd(T.cost), T.unpricedTokens ? "Plus " + compact(T.unpricedTokens) + " tokens on models without a known price" : "From Anthropic's published prices", "hero"));
+  k.appendChild(tile("Tokens used", compact(T.allTokens), compact(T.inputTokens) + " in, " + compact(T.tokens.out) + " out"));
+  k.appendChild(tile("Served from cache", pct(T.cacheHitRate), "Of input tokens. Higher is cheaper."));
+  k.appendChild(tile("Saved by caching", usd(T.cacheSaving), "Against paying full price for every token"));
+  var pm = d.perMinute;
+  k.appendChild(tile("Right now", pm === null || pm === undefined ? "n/a" : compact(pm) + "/min", pm === null || pm === undefined ? "Pick 1 hour or 6 hours" : "Average over the last 5 minutes"));
+  var m = d.month;
+  k.appendChild(tile("This month so far", usd(m.cost), "On track for " + usd(m.projectedCost) + " by month end"));
+}
+
+// ----- stacked column chart with hover -----
+function niceMax(v) {
+  if (v <= 0) return 1;
+  var p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+  // steps that split cleanly into four gridlines (0.25, 0.5, 1, 2, 2.5 of a power of ten)
+  var n = f <= 1 ? 1 : f <= 2 ? 2 : f <= 4 ? 4 : f <= 8 ? 8 : 10;
+  return n * p;
+}
+function timeLabel(iso, bucket, long) {
+  var t = new Date(iso);
+  if (bucket === "1d") return t.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  if (long) return t.toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  if (bucket === "1h") return t.toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return t.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+function roundTop(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  return "M" + x + "," + (y + h) + "V" + (y + r) + "Q" + x + "," + y + " " + (x + r) + "," + y + "H" + (x + w - r) + "Q" + (x + w) + "," + y + " " + (x + w) + "," + (y + r) + "V" + (y + h) + "Z";
+}
+
+// cols: [{label, long, parts:[number...]}], keys: [{label, css}], fmt(number)
+function stackedChart(host, cols, keys, fmt, ariaLabel) {
+  host.textContent = "";
+  var total = cols.reduce(function (s, c) { return s + c.parts.reduce(function (a, b) { return a + b; }, 0); }, 0);
+  if (!cols.length || total === 0) { host.appendChild(el("div", { class: "empty", text: "No usage in this range yet." })); return; }
+  var W = 900, H = 280, L = 52, R = 10, Tm = 10, B = 28, pw = W - L - R, ph = H - Tm - B;
+  var max = niceMax(Math.max.apply(null, cols.map(function (c) { return c.parts.reduce(function (a, b) { return a + b; }, 0); })));
+  var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": ariaLabel, tabindex: 0 });
+  for (var g = 0; g <= 4; g++) {
+    var gy = Tm + ph - (ph * g / 4);
+    svg.appendChild(svgEl("line", { x1: L, x2: W - R, y1: gy, y2: gy, stroke: cssVar(g === 0 ? "--axis" : "--grid"), "stroke-width": 1 }));
+    var tt = svgEl("text", { x: L - 8, y: gy + 4, "text-anchor": "end", class: "tick" }); tt.textContent = fmt(max * g / 4); svg.appendChild(tt);
+  }
+  var n = cols.length, bw = pw / n, w = Math.max(2, Math.min(24, bw * 0.72));
+  var every = Math.max(1, Math.ceil(n / 7));
+  var colEls = [];
+  cols.forEach(function (c, i) {
+    var x = L + i * bw + (bw - w) / 2, y = Tm + ph, grp = svgEl("g", {});
+    var lastNonZero = -1; c.parts.forEach(function (v, j) { if (v > 0) lastNonZero = j; });
+    c.parts.forEach(function (v, j) {
+      if (v <= 0) return;
+      var h = Math.max(1, v / max * ph), gap = j === 0 ? 0 : 2;
+      var top = y - h;
+      var fill = cssVar(keys[j].css);
+      var rect = j === lastNonZero && w >= 6 && h > 6
+        ? svgEl("path", { d: roundTop(x, top, w, h - gap, 4), fill: fill })
+        : svgEl("rect", { x: x, y: top, width: w, height: Math.max(1, h - gap), fill: fill });
+      grp.appendChild(rect);
+      y = top;
+    });
+    svg.appendChild(grp); colEls.push(grp);
+    if (i % every === 0) {
+      var xl = svgEl("text", { x: L + i * bw + bw / 2, y: H - 8, "text-anchor": "middle", class: "tick" });
+      xl.textContent = c.label; svg.appendChild(xl);
+    }
+  });
+  var cross = svgEl("line", { y1: Tm, y2: Tm + ph, stroke: cssVar("--muted"), "stroke-width": 1, visibility: "hidden" });
+  svg.appendChild(cross);
+  var hit = svgEl("rect", { x: L, y: Tm, width: pw, height: ph, fill: "transparent" });
+  svg.appendChild(hit);
+  host.appendChild(svg);
+  var tip = el("div", { class: "tip" }); tip.hidden = true; host.appendChild(tip);
+
+  var cur = -1;
+  function hide() {
+    cur = -1; tip.hidden = true; cross.setAttribute("visibility", "hidden");
+    colEls.forEach(function (g2) { g2.setAttribute("opacity", "1"); });
+  }
+  function show(i) {
+    if (i < 0 || i >= n) return hide();
+    cur = i;
+    colEls.forEach(function (g2, k) { g2.setAttribute("opacity", k === i ? "1" : "0.55"); });
+    var cx = L + i * bw + bw / 2;
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    tip.textContent = "";
+    tip.appendChild(el("div", { class: "tt", text: cols[i].long }));
+    var sum = 0;
+    keys.forEach(function (k2, j) {
+      sum += cols[i].parts[j];
+      var row = el("div", { class: "r" }, [el("span", { class: "k", style: "background:" + cssVar(k2.css) }), el("span", { text: k2.label, class: "sub" }), el("span", { class: "val", text: fmt(cols[i].parts[j]) })]);
+      tip.appendChild(row);
+    });
+    if (keys.length > 1) tip.appendChild(el("div", { class: "r", style: "border-top:1px solid var(--grid);margin-top:5px;padding-top:4px" }, [el("span", { text: "Total", class: "sub" }), el("span", { class: "val", text: fmt(sum) })]));
+    tip.hidden = false;
+    var hw = host.clientWidth, px = cx / W * hw, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(hw - tw, px + 14 > hw - tw ? px - tw - 14 : px + 14)) + "px";
+    tip.style.top = "6px";
+  }
+  hit.addEventListener("pointermove", function (e) {
+    var r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W;
+    show(Math.floor((x - L) / bw));
+  });
+  hit.addEventListener("pointerleave", hide);
+  svg.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight") { e.preventDefault(); show(Math.min(n - 1, cur + 1)); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); show(Math.max(0, cur < 0 ? n - 1 : cur - 1)); }
+    else if (e.key === "Escape") hide();
+  });
+  svg.addEventListener("focus", function () { if (cur < 0) show(n - 1); });
+  svg.addEventListener("blur", hide);
+}
+
+function legend(host, keys) {
+  host.textContent = "";
+  keys.forEach(function (k) {
+    host.appendChild(el("span", {}, [el("i", { style: "background:" + cssVar(k.css) }), k.label + (k.note ? " (" + k.note + ")" : "")]));
+  });
+}
+
+function renderTokens() {
+  var d = state.data;
+  var unit = d.mergedMinutes ? d.mergedMinutes + " minutes" : d.bucket === "1m" ? "minute" : d.bucket === "1h" ? "hour" : "day";
+  $("tokensSub").textContent = "Each column is one " + unit + ". The more green, the more you're saving.";
+  legend($("tokensLegend"), TOKEN_SERIES);
+  var cols = d.series.map(function (p) {
+    var t = tk(p.tokens);
+    return { label: timeLabel(p.t, d.bucket), long: timeLabel(p.t, d.bucket, true), parts: [t.uncached, t.write, t.read, t.out] };
+  });
+  stackedChart($("tokensChart"), cols, TOKEN_SERIES, compact, "Tokens over time, stacked by type");
+}
+
+function renderCost() {
+  var d = state.data;
+  var ids = {};
+  d.series.forEach(function (p) { Object.keys(p.byModel).forEach(function (m) { ids[m] = 1; }); });
+  var keys = Object.keys(ids).sort().map(function (m) { return { id: m, label: modelName(m), css: modelColor(m) }; });
+  legend($("costLegend"), keys);
+  var cols = d.series.map(function (p) {
+    return { label: timeLabel(p.t, d.bucket), long: timeLabel(p.t, d.bucket, true), parts: keys.map(function (k) { return p.byModel[k.id] ? p.byModel[k.id].cost : 0; }) };
+  });
+  stackedChart($("costChart"), cols, keys, usd, "Cost over time, stacked by model");
+}
+
+function barTable(host, rows, colsDef) {
+  host.textContent = "";
+  if (!rows.length) { host.appendChild(el("div", { class: "empty", text: "Nothing yet." })); return; }
+  var maxc = Math.max.apply(null, rows.map(function (r) { return r.cost; })) || 1;
+  var table = el("table"), head = el("tr");
+  colsDef.forEach(function (c) { head.appendChild(el("th", { class: c.n ? "n" : "", text: c.h })); });
+  table.appendChild(head);
+  rows.forEach(function (r) {
+    var tr = el("tr");
+    colsDef.forEach(function (c, i) {
+      var td = el("td", { class: c.n ? "n" : "" });
+      if (i === 0) {
+        td.appendChild(el("div", { text: r.name }));
+        td.appendChild(el("div", { class: "bar" }, [el("b", { style: "width:" + Math.max(2, r.cost / maxc * 100) + "%;background:" + cssVar(r.css || "--s-uncached") })]));
+      } else td.textContent = c.v(r);
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  host.appendChild(table);
+}
+function renderModels() {
+  var d = state.data;
+  barTable($("models"), d.models.map(function (m) { m.css = modelColor(m.model); m.name = modelName(m.model); return m; }), [
+    { h: "Model" }, { h: "Tokens", n: 1, v: function (r) { return compact(totalOf(r.tokens)); } },
+    { h: "Cache read", n: 1, v: function (r) { var i = r.tokens.uncached + r.tokens.w5 + r.tokens.w1 + r.tokens.read; return i ? pct(r.tokens.read / i) : "n/a"; } },
+    { h: "Cost", n: 1, v: function (r) { return r.priced ? usd(r.cost) : "no price"; } }
+  ]);
+}
+function renderKeys() {
+  var d = state.data;
+  barTable($("keys"), d.keys, [
+    { h: "Key" }, { h: "Tokens", n: 1, v: function (r) { return compact(totalOf(r.tokens)); } },
+    { h: "Cost", n: 1, v: function (r) { return usd(r.cost); } }
+  ]);
+}
+
+function renderHours() {
+  var d = state.data, card = $("cHours");
+  if (d.bucket !== "1h" || d.range === "6h") { card.hidden = true; return; }
+  card.hidden = false;
+  var hrs = []; for (var i = 0; i < 24; i++) hrs.push(0);
+  d.series.forEach(function (p) { hrs[new Date(p.t).getHours()] += totalOf(p.tokens); });
+  var cols = hrs.map(function (v, h) { var l = (h < 10 ? "0" : "") + h + ":00"; return { label: l, long: l + " hour", parts: [v] }; });
+  stackedChart($("hoursChart"), cols, [{ label: "Tokens", css: "--s-uncached" }], compact, "Total tokens by hour of day");
+}
+
+function renderBudget() {
+  var d = state.data, out = $("budgetOut"); out.textContent = "";
+  var b = parseFloat($("budget").value);
+  if (!d) return;
+  if (!(b > 0)) { out.appendChild(el("p", { class: "sub", text: "Set a budget and this shows how close you are. It warns you before you pass it." })); return; }
+  var m = d.month, used = m.cost / b, proj = m.projectedCost / b;
+  var status = used >= 1 || proj >= 1 ? ["crit", "Over budget", "✕"] : used >= 0.8 || proj >= 0.9 ? ["warn", "Watch this", "!"] : ["good", "On track", "✓"];
+  var colour = { crit: "--crit", warn: "--warn", good: "--good" }[status[0]];
+  out.appendChild(el("div", { class: "meter", role: "img", "aria-label": usd(m.cost) + " of " + usd(b) + " used" }, [el("b", { style: "display:block;height:100%;width:" + Math.min(100, used * 100) + "%;background:" + cssVar(colour) })]));
+  out.appendChild(el("p", { class: "sub" }, [el("strong", { text: status[2] + " " + status[1] + ". " }), usd(m.cost) + " of " + usd(b) + " used (" + pct(used) + "). On track for " + usd(m.projectedCost) + " by the end of the month."]));
+  if (status[0] !== "good") $("banners").appendChild(el("div", { class: "banner " + (status[0] === "crit" ? "err" : "warn"), role: "status", text: status[2] + " " + status[1] + ": " + usd(m.cost) + " spent of your " + usd(b) + " monthly budget." }));
+}
+
+function renderTable() {
+  var d = state.data; if (!d) return;
+  var t = $("dataTable"); t.textContent = "";
+  var head = el("tr"); ["Time", "New input", "Cache write", "Cache read", "Output", "Cost"].forEach(function (h, i) { head.appendChild(el("th", { class: i ? "n" : "", text: h })); }); t.appendChild(head);
+  d.series.forEach(function (p) {
+    var x = tk(p.tokens), tr = el("tr");
+    [timeLabel(p.t, d.bucket, true), x.uncached, x.write, x.read, x.out, usd(p.cost)].forEach(function (v, i) { tr.appendChild(el("td", { class: i ? "n" : "", text: typeof v === "number" ? Math.round(v).toLocaleString("en-GB") : v })); });
+    t.appendChild(tr);
+  });
+}
+
+$("csv").addEventListener("click", function () {
+  var d = state.data; if (!d) return;
+  var rows = [["time", "new_input", "cache_write", "cache_read", "output", "cost_usd"]];
+  d.series.forEach(function (p) { var x = tk(p.tokens); rows.push([p.t, x.uncached, x.write, x.read, x.out, p.cost.toFixed(6)]); });
+  var url = URL.createObjectURL(new Blob([rows.map(function (r) { return r.join(","); }).join("\n")], { type: "text/csv" }));
+  var a = el("a", { href: url, download: "daysback-usage-" + d.range + ".csv" }); document.body.appendChild(a); a.click(); a.remove();
+});
+
+// ---------- boot ----------
+setRanges();
+if (DEMO || load(PASS_KEY)) showApp(); else showGate("");
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (state.data) render(); });
+</script>
+</body>
+</html>
