@@ -1,6 +1,6 @@
-# DaysBack AI usage dashboard
+# AI usage dashboard
 
-Live token use and spend for your Anthropic account.
+Live token use and spend across everything on your Anthropic account.
 
 - `docs/index.html`: the dashboard (GitHub Pages). No secrets in it.
 - `supabase/functions/daysback-usage/`: reads Anthropic's usage report with a key that lives only in Supabase.

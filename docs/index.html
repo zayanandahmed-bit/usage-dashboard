@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DaysBack AI Usage</title>
+<title>AI Usage</title>
 <meta name="robots" content="noindex">
 <style>
 :root {
@@ -95,7 +95,7 @@ th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
 <body>
 
 <div class="gate" id="gate" hidden>
-  <h1>DaysBack AI usage</h1>
+  <h1>AI usage</h1>
   <p class="sub">Enter your passcode to see live token use and spend.</p>
   <form id="gateForm">
     <input id="gatePass" type="password" autocomplete="current-password" placeholder="Passcode" aria-label="Passcode" required>
@@ -107,8 +107,8 @@ th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; }
 <div class="wrap" id="app" hidden>
   <div class="top">
     <div>
-      <h1>DaysBack AI usage</h1>
-      <p class="sub">Tokens and spend from your Anthropic account, refreshed every minute.</p>
+      <h1>AI usage</h1>
+      <p class="sub">All your Claude usage and spend in one place, refreshed every minute.</p>
     </div>
     <div class="status">
       <span class="dot" id="dot"></span><span id="statusText">Connecting…</span>
@@ -628,7 +628,7 @@ $("csv").addEventListener("click", function () {
   var rows = [["time", "new_input", "cache_write", "cache_read", "output", "cost_usd"]];
   d.series.forEach(function (p) { var x = tk(p.tokens); rows.push([p.t, x.uncached, x.write, x.read, x.out, p.cost.toFixed(6)]); });
   var url = URL.createObjectURL(new Blob([rows.map(function (r) { return r.join(","); }).join("\n")], { type: "text/csv" }));
-  var a = el("a", { href: url, download: "daysback-usage-" + d.range + ".csv" }); document.body.appendChild(a); a.click(); a.remove();
+  var a = el("a", { href: url, download: "ai-usage-" + d.range + ".csv" }); document.body.appendChild(a); a.click(); a.remove();
 });
 
 // ---------- boot ----------
